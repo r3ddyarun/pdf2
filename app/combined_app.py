@@ -479,6 +479,13 @@ async def upload_file(
             detail=f"File size exceeds maximum allowed size of {settings.max_file_size_mb}MB"
         )
     
+    # Basic PDF validation
+    if len(file_content) < 4 or not file_content.startswith(b'%PDF'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PDF file: File does not appear to be a valid PDF"
+        )
+    
     try:
         # Generate unique file ID and S3 key
         file_id = str(uuid.uuid4())
@@ -595,7 +602,14 @@ async def process_file(
             )
         
         # Process PDF (no side effects in processor)
-        result = pdf_processor.process_pdf(file_content, file_id)
+        try:
+            result = pdf_processor.process_pdf(file_content, file_id)
+        except ValueError as ve:
+            # Handle user-friendly validation errors
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(ve)
+            )
 
         # Upload redacted bytes to S3
         redacted_key = s3_service.generate_redacted_file_key(f"{file_id}.pdf")
@@ -731,7 +745,14 @@ async def process_file_by_id(
             )
         
         # Process PDF (no side effects in processor)
-        result = pdf_processor.process_pdf(file_content, file_id)
+        try:
+            result = pdf_processor.process_pdf(file_content, file_id)
+        except ValueError as ve:
+            # Handle user-friendly validation errors
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(ve)
+            )
 
         # Upload redacted bytes to S3
         redacted_key = s3_service.generate_redacted_file_key(f"{file_id}.pdf")

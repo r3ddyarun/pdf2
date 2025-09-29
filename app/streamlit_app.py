@@ -142,8 +142,10 @@ def display_file_upload():
                         
                         st.success("✅ File processed successfully!")
                         st.rerun()
+                    else:
+                        st.error("❌ Processing failed. The file may be corrupted or in an unsupported format.")
                 else:
-                    st.error("Upload failed. Please try again.")
+                    st.error("❌ Upload failed. Please check the file and try again.")
 
 
 def display_results():

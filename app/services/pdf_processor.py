@@ -95,6 +95,28 @@ class PDFProcessor:
         
         return luhn_checksum(card_number) == 0
     
+    def _validate_pdf_header(self, file_content: bytes) -> bool:
+        """Validate PDF file header to detect corrupt files early"""
+        try:
+            # Check minimum file size
+            if len(file_content) < 4:
+                return False
+            
+            # Check PDF header signature
+            pdf_header = file_content[:4]
+            if pdf_header != b'%PDF':
+                return False
+            
+            # Check for PDF version
+            header_line = file_content[:20].decode('ascii', errors='ignore')
+            if not any(version in header_line for version in ['1.0', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '2.0']):
+                return False
+            
+            return True
+        except Exception as e:
+            logger.warning(f"PDF header validation failed: {e}")
+            return False
+
     def process_pdf(self, file_content: bytes, file_id: str) -> Dict[str, Any]:
         """Process PDF file for content detection and redaction.
 
@@ -106,18 +128,40 @@ class PDFProcessor:
         doc = None
         
         try:
-            # Open PDF document
-            doc = fitz.open(stream=file_content, filetype="pdf")
+            # Validate PDF file before processing
+            if not self._validate_pdf_header(file_content):
+                raise ValueError("Invalid PDF file: Corrupted or unsupported file format")
+            
+            # Open PDF document with additional error handling
+            try:
+                doc = fitz.open(stream=file_content, filetype="pdf")
+            except Exception as open_error:
+                if "password" in str(open_error).lower():
+                    raise ValueError("Password-protected PDF files are not supported")
+                elif "corrupt" in str(open_error).lower() or "damaged" in str(open_error).lower():
+                    raise ValueError("PDF file appears to be corrupted or damaged")
+                else:
+                    raise ValueError(f"Unable to open PDF file: {str(open_error)}")
+            
+            # Validate document structure
+            if doc is None or doc.page_count == 0:
+                raise ValueError("PDF file contains no pages or is empty")
+            
             total_pages = len(doc)
             redaction_blocks = []
             
             logger.info(f"Processing PDF with {total_pages} pages")
             
-            # Process each page
+            # Process each page with error handling
             for page_num in range(total_pages):
-                page = doc[page_num]
-                page_blocks = self._process_page(page, page_num)
-                redaction_blocks.extend(page_blocks)
+                try:
+                    page = doc[page_num]
+                    page_blocks = self._process_page(page, page_num)
+                    redaction_blocks.extend(page_blocks)
+                except Exception as page_error:
+                    logger.warning(f"Error processing page {page_num + 1}: {page_error}")
+                    # Continue processing other pages even if one fails
+                    continue
             
             # Apply redactions
             self._apply_redactions(doc, redaction_blocks)
@@ -143,6 +187,10 @@ class PDFProcessor:
             logger.info(f"PDF processing completed in {processing_time:.2f} seconds")
             return result
             
+        except ValueError as ve:
+            # User-friendly error for corrupt/invalid files
+            logger.error(f"PDF validation failed: {ve}", extra={'file_id': file_id})
+            raise ve
         except Exception as e:
             logger.error(f"Failed to process PDF: {e}", exc_info=True, extra={
                 'file_id': file_id,
@@ -150,7 +198,13 @@ class PDFProcessor:
                 'error_details': str(e),
                 'stack_trace': traceback.format_exc()
             })
-            raise
+            # Convert technical errors to user-friendly messages
+            if "memory" in str(e).lower():
+                raise ValueError("PDF file is too large or complex to process")
+            elif "timeout" in str(e).lower():
+                raise ValueError("PDF processing timed out - file may be too complex")
+            else:
+                raise ValueError(f"Unable to process PDF file: {str(e)}")
         finally:
             # Ensure document is properly closed
             if doc is not None:
@@ -167,12 +221,14 @@ class PDFProcessor:
         
         # Extract text with position information
         text_instances = page.get_text("dict")
+        counter=0
         
         for block in text_instances["blocks"]:
             if "lines" in block:
                 for line in block["lines"]:
                     for span in line["spans"]:
                         text = span["text"]
+                        counter+=1
                         if text.strip():
                             detected_items = self.detect_content(text)
                             
@@ -192,7 +248,8 @@ class PDFProcessor:
                                     original_text=original_text
                                 )
                                 blocks.append(redaction_block)
-        
+
+        logger.info(f"Total blocks detected: {counter}")
         return blocks
     
     def _apply_redactions(self, doc: fitz.Document, blocks: List[RedactionBlock]) -> None:
