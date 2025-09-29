@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # PDF Redaction API metrics
+  - job_name: 'pdf-redaction-api'
+    static_configs:
+      - targets: ['pdf-redaction-api:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # ClickHouse metrics
+  - job_name: 'clickhouse'
+    static_configs:
+      - targets: ['clickhouse:8123']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter for system metrics (if added)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+# Alerting rules
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Recording rules
+recording_rules:
+  - name: "pdf_redaction_rules"
+    rules:
+      - record: "pdf_redaction:request_rate"
+        expr: "rate(http_requests_total[5m])"
+      
+      - record: "pdf_redaction:processing_time_p95"
+        expr: "histogram_quantile(0.95, rate(pdf_processing_duration_seconds_bucket[5m]))"
+      
+      - record: "pdf_redaction:error_rate"
+        expr: "rate(http_requests_total{status_code=~\"5..\"}[5m])"

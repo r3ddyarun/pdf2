@@ -1,0 +1,27 @@
+📊 PDF Redaction Service Test Report
+==================================================
+Test Date: 2025-09-29 12:58:25
+Server URL: http://localhost:8000
+Total Files Tested: 1
+
+📈 Summary Statistics:
+  Successful: 0
+  Failed Upload: 0
+  Failed Processing: 1
+  Failed Download: 0
+  Other Issues: 0
+
+📁 File Types Tested:
+  sensitive: 1
+
+📏 Size Statistics:
+  Total Original Size: 3,606 bytes (0.00 MB)
+
+📋 Detailed Results:
+--------------------------------------------------
+
+File: sensitive_1_20250929_125424.pdf
+  Type: sensitive
+  Size: 3,606 bytes
+  Status: failed_processing
+  Processing Error: Processing failed: 500

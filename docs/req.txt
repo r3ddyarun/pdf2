@@ -1,0 +1,10 @@
+use @docs/pdfredact.pdf for requirements. create python server with a simple UI page in stream lit to upload the file. ui should allow upload file, get response and show the response summary in a structured format. include details on sections redacted and reason in the api response. reason like it is email/ssn/credit card etc
+generate the apis mentioned along with the bonus features. update data in clickhouse. 
+uploaded document in stored in aws s3. on upload button, call the api to get signed s3 url. upload document to s3 from react app. call findings api with the file location(bucket,key)
+limit the file size to a reasonable value so the file can be processed in memory with out any problems. use pymupdf for pdf parsing and redacting. redact using blocks making sure the actual data is removed from the file. upload the redacted file to s3 and include file bucket, key in response. add api to download the file for bucket,key. use this api to download the file(on clicking download on redacted file)
+
+add test cases for apis. 
+add abstract utilities for database. 
+add orm
+make the whole thing enterprise ready
+add metrics, which will also be pushed to clickhouse
