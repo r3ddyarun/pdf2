@@ -126,9 +126,14 @@ def display_file_upload():
                 upload_response = make_api_request("POST", "/upload", files=files)
                 
                 if upload_response and upload_response.get("file_id"):
-                    # Call process-by-id endpoint
+                    # Call process endpoint with file info (id, bucket, key)
                     file_id = upload_response["file_id"]
-                    process_response = make_api_request("POST", f"/process")
+                    process_data = {
+                        "file_id": file_id,
+                        "bucket": upload_response.get("s3_bucket"),
+                        "key": upload_response.get("s3_key"),
+                    }
+                    process_response = make_api_request("POST", "/process", data=process_data)
                     
                     if process_response:
                         # Store response in session state
