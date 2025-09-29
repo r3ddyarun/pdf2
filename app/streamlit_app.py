@@ -80,8 +80,11 @@ def make_api_request(method: str, endpoint: str, data: Optional[Dict] = None, fi
         elif method.upper() == "POST":
             if files:
                 response = requests.post(url, files=files)
-            else:
+            elif data is not None:
                 response = requests.post(url, json=data)
+            else:
+                # Allow POST with no body (e.g., /process/{file_id})
+                response = requests.post(url)
         else:
             st.error(f"Unsupported HTTP method: {method}")
             return None
@@ -120,15 +123,22 @@ def display_file_upload():
                 # Upload file to API
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
                 
-                response = make_api_request("POST", "/process", files=files)
+                upload_response = make_api_request("POST", "/upload", files=files)
                 
-                if response:
-                    # Store response in session state
-                    st.session_state.process_response = response
-                    st.session_state.file_processed = True
+                if upload_response and upload_response.get("file_id"):
+                    # Call process-by-id endpoint
+                    file_id = upload_response["file_id"]
+                    process_response = make_api_request("POST", f"/process")
                     
-                    st.success("✅ File processed successfully!")
-                    st.rerun()
+                    if process_response:
+                        # Store response in session state
+                        st.session_state.process_response = process_response
+                        st.session_state.file_processed = True
+                        
+                        st.success("✅ File processed successfully!")
+                        st.rerun()
+                else:
+                    st.error("Upload failed. Please try again.")
 
 
 def display_results():

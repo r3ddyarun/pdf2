@@ -405,7 +405,16 @@ async def root():
                 html += '<h4>📋 Processing Summary</h4>';
                 html += `<p><strong>Total pages:</strong> ${result.total_pages}</p>`;
                 html += `<p><strong>Processing time:</strong> ${result.processing_time_seconds.toFixed(2)}s</p>`;
-                html += `<p><strong>Total redactions:</strong> ${result.total_redactions}</p>`;
+                html += `<p><strong>Total redactions:</strong> ${result.summary.total_redactions}</p>`;
+                if (result.summary.redactions_by_reason) {
+                    html += '<p><strong>Redactions by category:</strong></p>';
+                    html += '<ul>';
+                    for (const [category, count] of Object.entries(result.summary.redactions_by_reason)) {
+                        const formattedCategory = category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        html += `<li>${formattedCategory}: ${count}</li>`;
+                    }
+                    html += '</ul>';
+                }
                 html += '</div>';
                 
                 if (result.redactions_by_reason && Object.keys(result.redactions_by_reason).length > 0) {
@@ -837,9 +846,11 @@ async def download_file_by_id(
                 detail=f"File not found: {file_id}"
             )
         
-        # Extract download information
-        redacted_bucket = result.get("redacted_s3_bucket")
-        redacted_key = result.get("redacted_s3_key")
+        # Extract download information from latest file history entry
+        file_history = result.get("file_history") or []
+        latest_entry = file_history[0] if isinstance(file_history, list) and len(file_history) > 0 else {}
+        redacted_bucket = latest_entry.get("redacted_s3_bucket")
+        redacted_key = latest_entry.get("redacted_s3_key")
         
         if not redacted_bucket or not redacted_key:
             raise HTTPException(
